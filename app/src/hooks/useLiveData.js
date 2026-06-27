@@ -10,6 +10,15 @@ import { fetchPersecutionScore } from '../api/persecution'
 import { fetchApostasyScore }    from '../api/apostasy'
 import { fetchIsraelScore }      from '../api/israel'
 import { loadHistory, recordScore } from './useHistory'
+import { CATEGORIES } from '../data/categories'
+
+// Pre-populate GDELT-backed categories with their calibrated baselines so
+// cards are never blank — live data overwrites these as it arrives.
+const baselineScores = Object.fromEntries(
+  CATEGORIES
+    .filter(c => c.baseline != null)
+    .map(c => [c.id, { score: c.baseline, detail: { fallback: true, base: c.baseline } }])
+)
 
 const H6  = 6  * 60 * 60 * 1000
 const H1  = 60 * 60 * 1000
@@ -33,13 +42,14 @@ export function useLiveData() {
     wars: null, earthquakes: null, famine: null, pestilence: null,
     disasters: null, cosmic: null, moral: null, persecution: null,
     apostasy: null, israel: null,
+    ...baselineScores,
   })
   const [history, setHistory]       = useState(() => loadHistory())
   const [lastUpdated, setLastUpdated] = useState({})
   const [loading, setLoading]       = useState(true)
   const [errors, setErrors]         = useState({})
   const lastUpdatedRef              = useRef({})
-  const scoresRef                   = useRef({})
+  const scoresRef                   = useRef({ ...baselineScores })
   const inFlightRef                 = useRef(new Set())
   const retryAfterRef               = useRef({})  // id → timestamp: don't retry before this
 

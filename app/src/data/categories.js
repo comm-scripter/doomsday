@@ -8,6 +8,7 @@ export const CATEGORIES = [
     scripture: 'Matthew 24:6–7',
     description: 'Nation against nation, kingdom against kingdom',
     apiStatus: 'live',
+    baseline: 40,
   },
   {
     id: 'earthquakes',
@@ -28,6 +29,7 @@ export const CATEGORIES = [
     scripture: 'Revelation 6:5–6',
     description: 'A quart of wheat for a denarius',
     apiStatus: 'live',
+    baseline: 55,
   },
   {
     id: 'pestilence',
@@ -68,6 +70,7 @@ export const CATEGORIES = [
     scripture: '2 Timothy 3:1–5',
     description: 'Perilous times, lawlessness increased',
     apiStatus: 'live',
+    baseline: 45,
   },
   {
     id: 'persecution',
@@ -78,6 +81,7 @@ export const CATEGORIES = [
     scripture: 'Matthew 24:9',
     description: 'Hated by all nations because of me',
     apiStatus: 'live',
+    baseline: 58,
   },
   {
     id: 'apostasy',
@@ -88,6 +92,7 @@ export const CATEGORIES = [
     scripture: '2 Thessalonians 2:3',
     description: 'Great falling away from the faith',
     apiStatus: 'live',
+    baseline: 46,
   },
   {
     id: 'israel',
@@ -98,6 +103,7 @@ export const CATEGORIES = [
     scripture: 'Ezekiel 37',
     description: 'The fig tree generation',
     apiStatus: 'live',
+    baseline: 65,
   },
 ]
 

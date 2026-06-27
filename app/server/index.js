@@ -15,19 +15,27 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const GDELT_MIN_INTERVAL = 10000  // ms between upstream requests
 const GDELT_PENALTY_429  = 35000  // extra wait after a 429
 const GDELT_TTL = 6 * 60 * 60 * 1000
-const gdeltCache = new Map()
-const gdeltQueue = []
-let gdeltNextAllowed = 0  // absolute timestamp: don't send before this
-let gdeltProcessing = false
+const gdeltCache   = new Map()
+const gdeltQueue   = []
+const gdeltWaiters = new Map()  // upstream URL → [{ resolve, reject }] — dedup in-flight requests
+let gdeltNextAllowed = 0
+let gdeltProcessing  = false
 
 async function processGdeltQueue() {
   if (gdeltProcessing) return
   gdeltProcessing = true
   while (gdeltQueue.length > 0) {
-    const { upstream, resolve, reject } = gdeltQueue.shift()
+    const { upstream } = gdeltQueue.shift()
     const wait = Math.max(0, gdeltNextAllowed - Date.now())
     console.log(`[GDELT] queue: ${gdeltQueue.length} remaining, wait ${Math.round(wait / 1000)}s`)
     if (wait > 0) await new Promise(r => setTimeout(r, wait))
+
+    const settle = (fn) => {
+      const waiters = gdeltWaiters.get(upstream) || []
+      gdeltWaiters.delete(upstream)
+      waiters.forEach(fn)
+    }
+
     try {
       const r = await fetch(upstream, {
         headers: {
@@ -37,15 +45,15 @@ async function processGdeltQueue() {
         signal: AbortSignal.timeout(15000),
       })
       if (r.status === 429) {
-        const text = await r.text().catch(() => '')
+        await r.text().catch(() => '')
         console.error(`[GDELT] 429 rate-limited — pausing ${GDELT_PENALTY_429 / 1000}s before next`)
         gdeltNextAllowed = Date.now() + GDELT_PENALTY_429
-        reject({ status: 429, message: 'GDELT rate limited' })
+        settle(w => w.reject({ status: 429, message: 'GDELT rate limited' }))
       } else if (!r.ok) {
         const text = await r.text().catch(() => '')
         console.error(`[GDELT] upstream ${r.status}: ${text}`)
         gdeltNextAllowed = Date.now() + GDELT_MIN_INTERVAL
-        reject({ status: r.status, message: 'GDELT upstream error' })
+        settle(w => w.reject({ status: r.status, message: 'GDELT upstream error' }))
       } else {
         const text = await r.text()
         let data
@@ -54,17 +62,17 @@ async function processGdeltQueue() {
         } catch {
           console.error('[GDELT] non-JSON response:', text.slice(0, 80))
           gdeltNextAllowed = Date.now() + GDELT_MIN_INTERVAL
-          reject({ status: 502, message: 'GDELT returned non-JSON response' })
+          settle(w => w.reject({ status: 502, message: 'GDELT returned non-JSON response' }))
           continue
         }
         gdeltNextAllowed = Date.now() + GDELT_MIN_INTERVAL
         gdeltCache.set(upstream, { data, expiry: Date.now() + GDELT_TTL })
-        resolve(data)
+        settle(w => w.resolve({ data, fromCache: false }))
       }
     } catch (e) {
       gdeltNextAllowed = Date.now() + GDELT_MIN_INTERVAL
       console.error('[GDELT] fetch error:', e.message)
-      reject({ status: 502, message: e.message })
+      settle(w => w.reject({ status: 502, message: e.message }))
     }
   }
   gdeltProcessing = false
@@ -77,7 +85,14 @@ function gdeltFetch(upstream) {
     return Promise.resolve({ data: cached.data, fromCache: true })
   }
   return new Promise((resolve, reject) => {
-    gdeltQueue.push({ upstream, resolve: data => resolve({ data, fromCache: false }), reject })
+    if (gdeltWaiters.has(upstream)) {
+      // URL already queued — attach to existing request instead of queuing again
+      gdeltWaiters.get(upstream).push({ resolve, reject })
+      console.log(`[GDELT] dedup — attached to existing request (queue depth ${gdeltQueue.length})`)
+      return
+    }
+    gdeltWaiters.set(upstream, [{ resolve, reject }])
+    gdeltQueue.push({ upstream })
     console.log(`[GDELT] queued — queue depth now ${gdeltQueue.length}`)
     processGdeltQueue()
   })

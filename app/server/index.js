@@ -23,7 +23,7 @@ app.get('/api/gdelt', async (req, res) => {
 })
 
 // WHO Disease Outbreak News RSS — lacks CORS headers
-app.get('/api/who/*', async (req, res) => {
+app.get('/api/who/*path', async (req, res) => {
   const upstreamPath = req.path.replace('/api/who', '')
   const upstream = `https://www.who.int${upstreamPath}`
   try {
@@ -37,7 +37,7 @@ app.get('/api/who/*', async (req, res) => {
 })
 
 // GDACS disaster alerts RSS — lacks CORS headers
-app.get('/api/gdacs/*', async (req, res) => {
+app.get('/api/gdacs/*path', async (req, res) => {
   const upstreamPath = req.path.replace('/api/gdacs', '')
   const upstream = `https://www.gdacs.org${upstreamPath}`
   try {

@@ -146,6 +146,11 @@ Open http://localhost:5173
 - [x] `timeAgo()` helper shows "just now / Xm ago / Xh ago" in the panel header
 
 ### Remaining / Future Work
+- [ ] **NEXT SESSION — Debug failing API fetches on production server:**
+  - Wars: "GDELT fetch failed"
+  - Famine: "ReliefWeb fetch failed"
+  - Moral: "GDELT fetch failed"
+  - Likely cause: Express proxy on AWS can't reach upstream APIs (network/firewall/timeout issue) — need to test with `curl` on the server and check error logs
 - [ ] Allow manual override of the 4 annual baselines via a settings panel (so they can be updated each January without a code change)
 - [ ] Consider adding a "share" / screenshot button
 - [ ] Consider a "history" view showing the total meter score over time

@@ -7,7 +7,7 @@ const BASE = 58
 
 export async function fetchPersecutionScore() {
   return gdeltHybridScore(
-    '"Christians" AND (persecution OR persecuted OR "church attack" OR martyrs OR "religious freedom")',
+    '"Christian persecution" OR "persecuted Christians" OR "Christians killed" OR "church attack" OR "religious persecution" OR "Christian martyrs"',
     BASE,
   )
 }

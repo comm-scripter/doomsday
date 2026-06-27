@@ -5,7 +5,7 @@
 
 export async function gdeltHybridScore(query, baseScore) {
   const params = new URLSearchParams({
-    query,
+    query: `(${query})`,  // GDELT requires OR'd terms wrapped in ()
     mode: 'artlist',
     maxrecords: 100,
     format: 'json',

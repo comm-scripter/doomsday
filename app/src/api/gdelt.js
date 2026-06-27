@@ -5,8 +5,14 @@
 export async function fetchConflictScore() {
   // Routed through /api/gdelt proxy (Vite dev) or Express server (production)
   // to avoid GDELT's missing CORS headers
-  const url =
-    '/api/gdelt?query=war%20OR%20conflict%20OR%20military%20attack&mode=artlist&maxrecords=250&format=json&timespan=24h'
+  const params = new URLSearchParams({
+    query: '(war OR conflict OR "military attack" OR "armed conflict" OR "military strike")',
+    mode: 'artlist',
+    maxrecords: 250,
+    format: 'json',
+    timespan: '24h',
+  })
+  const url = `/api/gdelt?${params}`
 
   const res = await fetch(url)
   if (!res.ok) throw new Error('GDELT fetch failed')

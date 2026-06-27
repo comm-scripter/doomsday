@@ -8,7 +8,7 @@ const BASE = 65
 
 export async function fetchIsraelScore() {
   return gdeltHybridScore(
-    '"Israel" AND (attack OR war OR Hamas OR Hezbollah OR Iran OR missiles OR rockets OR "military operation" OR conflict)',
+    '"Israel attack" OR "Israel war" OR "Hamas attack" OR "Hezbollah attack" OR "Iran Israel" OR "Israel missiles" OR "Israel military" OR "Gaza war"',
     BASE,
   )
 }

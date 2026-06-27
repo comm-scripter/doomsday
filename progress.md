@@ -145,12 +145,81 @@ Open http://localhost:5173
 - [x] `formatDetail()` helper covers all 10 category IDs with human-readable live data summaries
 - [x] `timeAgo()` helper shows "just now / Xm ago / Xh ago" in the panel header
 
+---
+
+## Session 7 — 2026-06-27
+
+### Completed — Debug failing API fetches in production
+
+#### Root causes found and fixed:
+- **GDELT (Wars, Moral)**: EC2 was firing 5 concurrent GDELT requests on page load, triggering 429 rate-limit ("1 request per 5 seconds"). Fixed with server-side queue (5.5s spacing) + 6-hour in-memory cache in `server/index.js`. All GDELT categories now queue on cold load (~30s total) then serve instantly from cache.
+- **ReliefWeb (Famine)**: Two issues — (1) famine was fetching directly from browser, CORS rejected by ReliefWeb when origin is `http://IP:3001`. (2) ReliefWeb v1 API decommissioned; v2 requires a registered appname.
+- **All proxies**: Added `User-Agent` header and `AbortSignal.timeout(15000)` to all upstream fetches; added `console.error` logging so errors appear in `pm2 logs`.
+
+#### ReliefWeb appname registration (pending)
+- ReliefWeb v2 (`https://api.reliefweb.int/v2/reports`) requires a registered appname
+- Registered appname submitted 2026-06-27: **`kkreiter-doomsdaymeter-x7k2`**
+- Registration page: https://apidoc.reliefweb.int/parameters#appname
+- Approval expected within ~2 days
+- **To activate once approved:**
+  1. Set env var on EC2: `RELIEFWEB_APPNAME=kkreiter-doomsdaymeter-x7k2`
+  2. Restore `famine.js` to use ReliefWeb POST API (see below)
+  3. `pm2 restart doomsday`
+
+#### Famine — temporary GDELT fallback
+- While waiting for ReliefWeb approval, `famine.js` switched to GDELT hybrid scoring (same pattern as Moral/Persecution/Apostasy/Israel)
+- Baseline: 55 (calibrated to 345M in acute food insecurity 2024, active famines in Sudan/Gaza/Yemen)
+- **To restore ReliefWeb later**, replace `famine.js` with:
+```js
+import { gdeltHybridScore } from './_gdeltHybrid' // remove this
+// famine.js — ReliefWeb v2 POST, routed through Express proxy
+const BASELINE_90_DAYS = 25
+export async function fetchFamineScore() {
+  const from = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+  const res = await fetch('/api/reliefweb', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      query: { value: 'famine OR "food crisis" OR "acute food insecurity" OR "food emergency"' },
+      filter: { field: 'date.created', value: { from: `${from}T00:00:00+00:00` } },
+      fields: { include: ['title'] },
+      limit: 5,
+    }),
+  })
+  if (!res.ok) throw new Error('ReliefWeb fetch failed')
+  const data = await res.json()
+  const count = data.totalCount ?? 0
+  const headlines = (data.data ?? []).map(d => d.fields?.title ?? '').filter(Boolean)
+  return { score: Math.min(100, Math.round((count / BASELINE_90_DAYS) * 50)), detail: { reports90d: count, baseline: BASELINE_90_DAYS, headlines } }
+}
+```
+
+- [x] Fixed stuck-on-loading — `useLiveData.js` now updates each category individually as it resolves (instead of batching after all 10 complete); app renders on first successful fetch; added per-category console logging with timestamps and score/detail
+
+---
+
+## Session 8 — 2026-06-27 (continued)
+
+### Completed — API reliability + gauge UI overhaul
+
+#### GDELT fixes
+- **Query syntax**: All GDELT queries were missing required `()` around OR terms — caused every query to return a non-JSON error, which then burned rate-limit budget. Fixed by wrapping all queries in `(${query})` in `_gdeltHybrid.js` and rewriting `gdelt.js` to use `URLSearchParams`.
+- **AND queries rewritten**: `persecution.js` and `israel.js` used `AND` syntax incompatible with GDELT's parentheses rules. Rewrote as pure OR phrase queries.
+- **Rate limit handling**: Upgraded server queue — `gdeltNextAllowed` timestamp replaces simple interval; 429 response triggers 35s penalty before next request; non-JSON 200 responses caught and rejected cleanly. Interval bumped to 10s.
+- **Client retry cooldown**: Failed categories now wait 5 minutes before retrying (tracked in `retryAfterRef`), preventing exponential queue buildup on repeated failures.
+- **In-flight deduplication**: `inFlightRef` Set prevents the same category from queuing twice if the 60s refresh timer fires before the previous fetch resolves.
+- **Refresh tick logging**: Each 60s tick logs which categories are 🔄fetching / ⏳in-flight / ❌cooldown(Xs) / ⏱Xs-until-refresh.
+
+#### Gauge UI — `DoomsdayGauge.jsx`
+- **Smooth needle animation**: Needle is now drawn statically at 0° and rotated via CSS `transform: rotate()` with `transform-origin` at hub center. CSS transition `1.4s cubic-bezier(0.34, 1.56, 0.64, 1)` gives springy sweep. Two `requestAnimationFrame` frames on first render let the browser paint the -180° start position before animating to the real score.
+- **Score counter**: JS `requestAnimationFrame` loop counts the score number up from 0 using easeOutBack easing, in sync with the needle sweep.
+- **Inner label band**: Removed pill badges; replaced with a thin inner arc ring (radius 126, stroke 16) divided into 6 continuous band segments. Each segment labeled with curved `<textPath>` text. Active segment glows (opacity 0.65 arc + full text); inactive segments nearly invisible (0.1/0.3). Transitions on `opacity 0.5s ease`.
+- **Semicircle cover**: Dark (`#0f172a`) upper half-circle (radius 50) centered at hub, flat edge at `CY+5` (bottom of pivot). Rendered after needle so it hides the needle base. Score number floats on top.
+- **Cover glow**: Blurred copy of cover shape (same path, band color, `feGaussianBlur stdDeviation=11`, opacity 0.32) rendered before the needle — creates colored ambient glow radiating upward from the cover edge onto the gauge face. Color transitions with band via `fill 0.5s ease`.
+
 ### Remaining / Future Work
-- [ ] **NEXT SESSION — Debug failing API fetches on production server:**
-  - Wars: "GDELT fetch failed"
-  - Famine: "ReliefWeb fetch failed"
-  - Moral: "GDELT fetch failed"
-  - Likely cause: Express proxy on AWS can't reach upstream APIs (network/firewall/timeout issue) — need to test with `curl` on the server and check error logs
+- [ ] **Activate ReliefWeb** once appname `kkreiter-doomsdaymeter-x7k2` is approved (set `RELIEFWEB_APPNAME` env var on EC2 and restore `famine.js`)
+- [ ] Deploy Sessions 7+8 fixes to EC2: `git pull && cd app && npm run build && pm2 restart doomsday`
 - [ ] Allow manual override of the 4 annual baselines via a settings panel (so they can be updated each January without a code change)
 - [ ] Consider adding a "share" / screenshot button
 - [ ] Consider a "history" view showing the total meter score over time

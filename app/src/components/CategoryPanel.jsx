@@ -223,6 +223,10 @@ function formatDetail(id, detail) {
     return parts.join(' · ')
   }
   if (id === 'famine') {
+    if (detail.articleCount != null) {
+      const sign = detail.modifier >= 0 ? '+' : ''
+      return `${detail.articleCount} famine/food-crisis articles in past 24 h · news tone ${detail.avgTone} · baseline ${detail.base}, adjusted ${sign}${detail.modifier} today`
+    }
     return `${detail.reports90d} food-crisis reports in the past 90 days · historical baseline ~${detail.baseline} per 90 days`
   }
   if (id === 'pestilence') {

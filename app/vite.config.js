@@ -12,6 +12,12 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: path => path.replace(/^\/api\/gdelt/, '/api/v2/doc/doc'),
       },
+      // ReliefWeb (UN OCHA) — proxy to avoid CORS from non-localhost origins
+      '/api/reliefweb': {
+        target: 'https://api.reliefweb.int',
+        changeOrigin: true,
+        rewrite: path => path.replace(/^\/api\/reliefweb/, '/v2/reports'),
+      },
       // WHO Disease Outbreak News RSS — lacks CORS headers
       '/api/who': {
         target: 'https://www.who.int',

@@ -54,7 +54,7 @@ app.get('/api/gdacs/*path', async (req, res) => {
 
 const distPath = path.join(__dirname, '../dist')
 app.use(express.static(distPath))
-app.get('*', (_, res) => res.sendFile(path.join(distPath, 'index.html')))
+app.get('*path', (_, res) => res.sendFile(path.join(distPath, 'index.html')))
 
 app.listen(PORT, () => {
   console.log(`Doomsday proxy server running on http://localhost:${PORT}`)

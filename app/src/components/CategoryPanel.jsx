@@ -210,6 +210,9 @@ export default function CategoryPanel({ scores, history, errors, lastUpdated }) 
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function formatDetail(id, detail) {
+  if (detail.fallback) {
+    return `Live news feed unavailable · showing calibrated annual baseline (${detail.base})`
+  }
   if (id === 'earthquakes') {
     return `${detail.m6_last30} magnitude 6.0+ earthquakes in the past 30 days (baseline: ${detail.baseline_m6}/month) · ${detail.m7_last90} magnitude 7.0+ in the past 90 days`
   }

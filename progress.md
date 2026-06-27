@@ -219,7 +219,32 @@ export async function fetchFamineScore() {
 
 ### Remaining / Future Work
 - [ ] **Activate ReliefWeb** once appname `kkreiter-doomsdaymeter-x7k2` is approved (set `RELIEFWEB_APPNAME` env var on EC2 and restore `famine.js`)
-- [ ] Deploy Sessions 7+8 fixes to EC2: `git pull && cd app && npm run build && pm2 restart doomsday`
-- [ ] Allow manual override of the 4 annual baselines via a settings panel (so they can be updated each January without a code change)
+- [ ] Allow manual override of the 6 annual baselines via a settings panel (so they can be updated each January without a code change)
 - [ ] Consider adding a "share" / screenshot button
 - [ ] Consider a "history" view showing the total meter score over time
+
+---
+
+## Session 9 — 2026-06-27 (continued)
+
+### Completed — Production deployment + GDELT resilience
+
+#### Deployed to EC2
+- [x] Sessions 7+8 deployed: `git pull && cd app && npm run build && pm2 restart doomsday`
+- [x] Corrected `SERVER.md` deploy instructions — now distinguishes frontend changes (require `npm run build`) from server-only changes (just `pm2 restart`); added hard-refresh note for browser cache
+
+#### GDELT queue snowball fix (server)
+- **Root cause**: multiple concurrent page loads each queued 5–6 GDELT requests for the same URLs; since 429s prevented any cache entries, every visitor multiplied the queue endlessly
+- **Fix**: added `gdeltWaiters` Map in `server/index.js` — if a URL is already queued, subsequent requests attach to the existing waiter list instead of adding a new queue entry; at most one upstream fetch per unique URL at any time
+
+#### GDELT negative cache + longer backoff (server)
+- After a 429, the URL is now suppressed for 30 minutes (`gdeltErrorCache`) — future requests for that URL return an immediate error without queuing, letting the EC2 IP recover
+- Increased inter-request interval from 10s → 15s; increased 429 penalty from 35s → 2 minutes
+
+#### Baseline fallback scores (client)
+- `_gdeltHybrid.js` and `gdelt.js` now catch all fetch errors and return `{ score: BASE, detail: { fallback: true, base: BASE } }` instead of throwing — GDELT categories never propagate errors to `useLiveData.js`
+- `CategoryPanel.jsx` `formatDetail()` detects `detail.fallback` and shows "Live news feed unavailable · showing calibrated annual baseline (N)"
+
+#### Instant baseline display on page load (client)
+- Added `baseline` field to the 6 GDELT-backed categories in `categories.js` (wars=40, famine=55, moral=45, persecution=58, apostasy=46, israel=65)
+- `useLiveData.js` initializes `scores` state and `scoresRef` with baseline values at startup — all 10 cards show a score the instant the page loads; live data silently overwrites baselines as GDELT responds

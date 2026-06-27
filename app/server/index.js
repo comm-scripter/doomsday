@@ -12,12 +12,14 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 // repeated page loads are instant; queue upstream fetches 5.5s apart so
 // simultaneous category requests don't trigger 429s.
 
-const GDELT_MIN_INTERVAL = 10000  // ms between upstream requests
-const GDELT_PENALTY_429  = 35000  // extra wait after a 429
-const GDELT_TTL = 6 * 60 * 60 * 1000
-const gdeltCache   = new Map()
-const gdeltQueue   = []
-const gdeltWaiters = new Map()  // upstream URL → [{ resolve, reject }] — dedup in-flight requests
+const GDELT_MIN_INTERVAL = 15000   // ms between upstream requests
+const GDELT_PENALTY_429  = 120000  // wait 2 min after any 429 before next attempt
+const GDELT_TTL          = 6 * 60 * 60 * 1000
+const GDELT_ERROR_TTL    = 30 * 60 * 1000  // suppress a URL for 30 min after 429
+const gdeltCache      = new Map()
+const gdeltErrorCache = new Map()  // upstream URL → expiry: don't retry before this
+const gdeltQueue      = []
+const gdeltWaiters    = new Map()  // upstream URL → [{ resolve, reject }] — dedup in-flight
 let gdeltNextAllowed = 0
 let gdeltProcessing  = false
 
@@ -46,8 +48,9 @@ async function processGdeltQueue() {
       })
       if (r.status === 429) {
         await r.text().catch(() => '')
-        console.error(`[GDELT] 429 rate-limited — pausing ${GDELT_PENALTY_429 / 1000}s before next`)
+        console.error(`[GDELT] 429 rate-limited — pausing ${GDELT_PENALTY_429 / 1000}s, suppressing URL for ${GDELT_ERROR_TTL / 60000}min`)
         gdeltNextAllowed = Date.now() + GDELT_PENALTY_429
+        gdeltErrorCache.set(upstream, Date.now() + GDELT_ERROR_TTL)
         settle(w => w.reject({ status: 429, message: 'GDELT rate limited' }))
       } else if (!r.ok) {
         const text = await r.text().catch(() => '')
@@ -83,6 +86,12 @@ function gdeltFetch(upstream) {
   if (cached && cached.expiry > Date.now()) {
     console.log(`[GDELT] cache hit (${gdeltQueue.length} in queue)`)
     return Promise.resolve({ data: cached.data, fromCache: true })
+  }
+  const errorExpiry = gdeltErrorCache.get(upstream)
+  if (errorExpiry && errorExpiry > Date.now()) {
+    const secsLeft = Math.round((errorExpiry - Date.now()) / 1000)
+    console.log(`[GDELT] suppressed — retry in ${secsLeft}s`)
+    return Promise.reject({ status: 429, message: `GDELT suppressed for ${secsLeft}s after rate limit` })
   }
   return new Promise((resolve, reject) => {
     if (gdeltWaiters.has(upstream)) {

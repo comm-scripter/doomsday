@@ -53,15 +53,20 @@ Port 3001 must be open inbound:
 
 ## Deploying Updates
 
-> Any time code changes are pushed to GitHub, run these three commands on the server:
-
+### Frontend changes (`app/src/` — React components, hooks, API files)
+A rebuild is required:
 ```bash
-cd /home/ec2-user/doomsday
-git pull
-pm2 restart doomsday
+cd /home/ec2-user/doomsday && git pull && cd app && npm run build && pm2 restart doomsday
+```
+Then hard-refresh the browser (Ctrl+Shift+R) to bust the cached old bundle.
+
+### Server-only changes (`app/server/index.js`)
+No rebuild needed — just pull and restart:
+```bash
+cd /home/ec2-user/doomsday && git pull && pm2 restart doomsday
 ```
 
-That's it. PM2 will reload the app with the latest code.
+When in doubt, run the full rebuild command — it's safe to run even when not strictly needed.
 
 ---
 

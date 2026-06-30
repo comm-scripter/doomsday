@@ -112,7 +112,10 @@ export function useLiveData() {
     Promise.all(promises).then(() => setLoading(false))
   }, [runFetcher])
 
-  const forceRefresh = useCallback(() => refresh(true), [refresh])
+  const forceRefresh = useCallback(() => {
+    setLoading(true)
+    refresh(true)
+  }, [refresh])
 
   useEffect(() => {
     refresh()

@@ -14,14 +14,12 @@ export async function fetchConflictScore() {
   })
   const url = `/api/gdelt?${params}`
 
-  let data
-  try {
-    const res = await fetch(url)
-    if (!res.ok) throw new Error('GDELT fetch failed')
-    data = await res.json()
-  } catch {
-    return { score: 40, detail: { fallback: true, base: 40 } }
+  const res = await fetch(url)
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body.error || `GDELT error ${res.status}`)
   }
+  const data = await res.json()
 
   const articles = data.articles || []
 

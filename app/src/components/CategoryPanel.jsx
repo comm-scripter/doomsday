@@ -111,7 +111,7 @@ function DetailPanel({ catId, scores, history, errors, lastUpdated }) {
       )}
 
       {/* Live data detail */}
-      {score !== null && raw?.detail && (
+      {score !== null && raw?.detail && !error && (
         <div className="mb-4 p-3 rounded-lg bg-slate-900/60 border border-slate-800">
           <p className="text-xs text-slate-600 uppercase tracking-widest mb-1">Live data</p>
           <p className="text-sm text-slate-300 leading-relaxed">

@@ -3,5 +3,6 @@ dist/
 .env
 .env.local
 *.log
+fetch-log.json
 .DS_Store
 Thumbs.db

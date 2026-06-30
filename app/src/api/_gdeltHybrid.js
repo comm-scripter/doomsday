@@ -12,40 +12,36 @@ export async function gdeltHybridScore(query, baseScore) {
     timespan: '24h',
   })
 
-  try {
-    const res = await fetch(`/api/gdelt?${params}`)
-    if (!res.ok) throw new Error('GDELT fetch failed')
+  const res = await fetch(`/api/gdelt?${params}`)
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body.error || `GDELT error ${res.status}`)
+  }
 
-    const data = await res.json()
-    const articles = data.articles ?? []
+  const data = await res.json()
+  const articles = data.articles ?? []
 
-    if (articles.length === 0) {
-      return {
-        score: baseScore,
-        detail: { articleCount: 0, avgTone: 0, base: baseScore, modifier: 0 },
-      }
-    }
-
-    const avgTone =
-      articles.reduce((sum, a) => sum + (parseFloat(a.tone) || 0), 0) / articles.length
-
-    // Negative tone (conflict/distress coverage) → positive modifier → higher score
-    const modifier = Math.round(Math.max(-20, Math.min(20, -(avgTone * 2))))
-    const score = Math.min(100, Math.max(0, baseScore + modifier))
-
-    return {
-      score,
-      detail: {
-        articleCount: articles.length,
-        avgTone: Math.round(avgTone * 100) / 100,
-        base: baseScore,
-        modifier,
-      },
-    }
-  } catch {
+  if (articles.length === 0) {
     return {
       score: baseScore,
-      detail: { fallback: true, base: baseScore },
+      detail: { articleCount: 0, avgTone: 0, base: baseScore, modifier: 0 },
     }
+  }
+
+  const avgTone =
+    articles.reduce((sum, a) => sum + (parseFloat(a.tone) || 0), 0) / articles.length
+
+  // Negative tone (conflict/distress coverage) → positive modifier → higher score
+  const modifier = Math.round(Math.max(-20, Math.min(20, -(avgTone * 2))))
+  const score = Math.min(100, Math.max(0, baseScore + modifier))
+
+  return {
+    score,
+    detail: {
+      articleCount: articles.length,
+      avgTone: Math.round(avgTone * 100) / 100,
+      base: baseScore,
+      modifier,
+    },
   }
 }

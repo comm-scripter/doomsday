@@ -79,11 +79,15 @@ export function useLiveData() {
       setErrors(prev => { const n = { ...prev }; delete n[id]; return n })
       recordScore(id, result.score)
       setHistory(loadHistory())
+      fetch('/api/log', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, status: 'ok', score: result.score, elapsed }) }).catch(() => {})
     } catch (e) {
       const cooldown = 5 * 60 * 1000  // 5 min retry cooldown after any failure
       retryAfterRef.current[id] = Date.now() + cooldown
       console.error(`[${new Date().toLocaleTimeString()}] [${id}] ✗ ${e.message} — retry in 5m`)
       setErrors(prev => ({ ...prev, [id]: e.message }))
+      fetch('/api/log', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, status: 'error', error: e.message, elapsed: Date.now() - t0 }) }).catch(() => {})
     } finally {
       inFlightRef.current.delete(id)
     }

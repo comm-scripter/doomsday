@@ -1,6 +1,7 @@
 import express from 'express'
 import { fileURLToPath } from 'url'
 import path from 'path'
+import fs from 'fs'
 
 const app = express()
 app.use(express.json())
@@ -176,6 +177,46 @@ app.get('/api/gdacs/*path', async (req, res) => {
     console.error('[GDACS] fetch error:', e.message)
     res.status(502).json({ error: e.message })
   }
+})
+
+// ── Fetch log ────────────────────────────────────────────────────────────────
+// Client POSTs each fetch result here. Entries accumulate in memory and are
+// flushed to fetch-log.json every 6 hours, overwriting the previous period.
+
+const LOG_PATH = path.join(__dirname, '../fetch-log.json')
+let logEntries    = []
+let logPeriodStart = new Date().toISOString()
+
+function flushLog() {
+  const now = new Date().toISOString()
+  const payload = {
+    period: { from: logPeriodStart, to: now },
+    entries: logEntries,
+  }
+  try {
+    fs.writeFileSync(LOG_PATH, JSON.stringify(payload, null, 2))
+    console.log(`[log] flushed ${logEntries.length} entries → fetch-log.json`)
+  } catch (e) {
+    console.error('[log] write failed:', e.message)
+  }
+  logEntries     = []
+  logPeriodStart = now
+}
+
+setInterval(flushLog, 6 * 60 * 60 * 1000)
+
+app.post('/api/log', (req, res) => {
+  const { id, status, score, error, elapsed } = req.body || {}
+  if (!id || !status) return res.status(400).end()
+  const entry = { ts: new Date().toISOString(), id, status, elapsed }
+  if (score  != null) entry.score = score
+  if (error) entry.error = error
+  logEntries.push(entry)
+  res.status(204).end()
+})
+
+app.get('/api/log', (req, res) => {
+  res.json({ period: { from: logPeriodStart, to: new Date().toISOString() }, entries: logEntries })
 })
 
 // ── Static frontend (production only) ───────────────────────────────────────
